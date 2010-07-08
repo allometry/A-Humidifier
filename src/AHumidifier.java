@@ -40,6 +40,9 @@ public class AHumidifier extends Script {
 	
 	@Override
 	public void onStart() {
+		Constants.WAIT = 1000;
+		input.MOUSE_SPEED = 2;
+		
 		try {
 			coinImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins.png"));
 			drinkImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/drink.png"));
@@ -146,7 +149,7 @@ public class AHumidifier extends Script {
 				input.moveMouse(humidifyInterface.getRealX(), humidifyInterface.getRealY());
 				humidifyInterface.click();
 				
-				wait(3000);
+				wait(2000);
 				
 				while(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
 					tabs.openTab(Constants.TAB_INVENTORY);
@@ -160,7 +163,7 @@ public class AHumidifier extends Script {
 					humidifierCasts++;
 				}
 				
-				return 3000;
+				return 500;
 			}
 		}
 		
