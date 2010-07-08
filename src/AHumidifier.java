@@ -287,7 +287,7 @@ public class AHumidifier extends Script {
 						input.pressArrow(Input.ARROW_RIGHT, random(1500, 3500));
 					
 					long c1Timeout = System.currentTimeMillis() + random(30000, 60000);
-					while(System.currentTimeMillis() < c1Timeout) {}
+					while(System.currentTimeMillis() < c1Timeout && !isStopping) {}
 					
 					break;
 
@@ -295,7 +295,7 @@ public class AHumidifier extends Script {
 					log("Antiban: No need to rotate this cycle...");
 					
 					long c2Timeout = System.currentTimeMillis() + random(30000, 60000);
-					while(System.currentTimeMillis() < c2Timeout) {}
+					while(System.currentTimeMillis() < c2Timeout && !isStopping) {}
 					
 					break;
 				}
