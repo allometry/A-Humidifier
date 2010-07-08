@@ -1,0 +1,109 @@
+<!--
+	Allomery Worker ANT
+	JAR packaging script and CURL upload tailored for Quirlion
+	
+	Copyright 2010, Steven Jabour
+	
+	License: Creative Commons Attribution 3.0
+	http://creativecommons.org/licenses/by/3.0/
+-->
+
+<project name="A. Worker ANT" default="package">
+	<!-- START: Configuration -->
+	
+	<property name="JAR.name" value="" />
+	<!-- //	JAR.name
+			Name of the JAR file you wish to package.
+			Quirlion requires that the JAR have the same name as the Class
+			
+			Example: ClassName.jar
+	-->
+	
+	<property name="QUIRLION.username" value="" />
+	<!-- //	QUIRLION.username
+			The username that you use to login on the forums and from
+			within Quirlion.
+			
+			This is not your Runescape username!
+	-->
+	
+	<property name="QUIRLION.MD5.password" value="" />
+	<!-- //	QUIRLION.MD5.password
+			An MD5 has of the password that you use to login on the forums
+			and from within Quirlion. 
+			
+			This is not your Runescape password!
+	-->
+	
+	<property name="QUIRLION.script_description" value="" />
+	<!-- //	QUIRLION.script_description
+			Simple description of your script.
+	-->
+	
+	<property name="QUIRLION.script_category" value="" />
+	<!-- //	QUIRLION.script_category
+			Please pick from one of the following categories. Try not to
+			mess this one up, so use copy and paste!
+			
+			No category
+			Agility
+			Combat
+			Construction
+			Cooking
+			Firemaking
+			Fishing
+			Fletching
+			Hunter
+			Magic
+			Mining
+			Money
+			Prayer
+			Smithing
+			Thieving
+			Tools
+			Woodcutting
+	-->
+	
+	<property name="CURL.path" value="/usr/bin/curl" />
+	<!-- //	CURL.path
+			Where your CURL binary is located on your system.
+	-->
+	
+	<!-- END: Configuration -->
+	
+	<target name="package" depends="jar, cookie, upload, clean" />
+	
+	<target name="jar">
+		<jar destfile="${JAR.name}" basedir="./bin/" includes="**/*.class" />
+	</target>
+	
+	<target name="cookie" depends="jar">
+		<exec executable="${CURL.path}">
+			<arg line="-ccookies.txt" />
+			<arg line="-d &quot;do=login&quot;" />
+			<arg line="-d &quot;url=%2Findex.php&quot;" />
+			<arg line="-d &quot;vb_login_username=${QUIRLION.username}&quot;" />
+			<arg line="-d &quot;vb_login_md5password=${QUIRLION.MD5.password}&quot;" />
+			<arg line="-d &quot;cookieuser=1&quot;" />
+			<arg line="&quot;http://quirlion.com/vb/login.php?do=login&quot;" />
+		</exec>
+	</target>
+	
+	<target name="upload" depends="cookie">
+		<exec executable="${CURL.path}">
+			<arg line="-bcookies.txt" />
+			<arg line="-H Expect:" />
+			<arg line="-F &quot;script=@${JAR.name};type=application/java-archive&quot;" />
+			<arg line="-F &quot;desc=${QUIRLION.script_description}&quot;" />
+			<arg line="-F &quot;category=${QUIRLION.script_category}&quot;" />
+			<arg line="-F &quot;type=private&quot;" />
+			<arg line="&quot;http://quirlion.com/repo/add-sql.php&quot;" />
+		</exec>
+	</target>
+	
+	<target name="clean" depends="jar, cookie, upload">
+		<delete file="${JAR.name}" />
+		<delete file="cookies.txt" />
+	</target>
+</project>
+
