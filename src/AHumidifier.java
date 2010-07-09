@@ -9,6 +9,7 @@ import java.awt.image.ImageObserver;
 import java.io.IOException;
 import java.net.URL;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Locale;
 
 import javax.imageio.ImageIO;
@@ -18,10 +19,12 @@ import com.quirlion.script.Input;
 import com.quirlion.script.Script;
 import com.quirlion.script.types.GEItem;
 import com.quirlion.script.types.Interface;
+import com.quirlion.script.types.Thing;
+import com.sun.xml.internal.xsom.impl.scd.Iterators.Map;
 
 public class AHumidifier extends Script {
 	private boolean hasFireStaff = false, hasSteamStaff = false, hasWaterStaff = false;
-	private boolean isStopping = false;
+	private boolean isStopping = false, isCameraRotating = false;
 	
 	private int astralRuneID = 9075, fireRuneID = 554, waterRuneID = 555;
 	private int fireStaffID = 1387, steamStaffID = 11736, waterStaffID = 1383;
@@ -81,6 +84,8 @@ public class AHumidifier extends Script {
 	
 	@Override
 	public int loop() {
+		if(isCameraRotating) return 1;
+		
 		if(!canCastHumidify()) {
 			log("Unable to cast humidify, exiting...");
 			isStopping = true;
@@ -90,13 +95,15 @@ public class AHumidifier extends Script {
 		if(inventory.getCount(filledVialID) > 0 || !inventory.containsItem(emptyVialID, filledVialID)) {
 			if(bank.open() || bank.isOpen()) {
 				if(inventory.containsItem(filledVialID)) {
-					bank.deposit(filledVialID, 0);
-					
 					tries = 0;
 					while(inventory.containsItem(filledVialID) && tries < 5) {
-						wait(1000);
+						input.moveMouse(inventory.findItem(filledVialID).getLocation());
 						bank.deposit(filledVialID, 0);
-						tries++;
+						
+						if(inventory.containsItem(filledVialID)) {
+							wait(1000);
+							tries++;
+						}
 					}
 					
 					if(tries >= 5) return 1;
@@ -107,20 +114,29 @@ public class AHumidifier extends Script {
 						stopScript();
 					}
 					
-					bank.withdraw(emptyVialID, 0);
-					
 					tries = 0;
 					while(!inventory.containsItem(emptyVialID) && tries < 5) {
-						wait(1000);
-						bank.withdraw(emptyVialID, 0);
-						tries++;
+						input.moveMouse(bank.getItem(emptyVialID).getRealX(), bank.getItem(emptyVialID).getRealY());
+						
+						if(bank.getItemCount(emptyVialID) <= (28 - inventory.getCount()))
+							bank.withdraw(emptyVialID, bank.getItemCount(emptyVialID) - 1);
+						else
+							bank.withdraw(emptyVialID, 0);
+						
+						if(!inventory.containsItem(emptyVialID)) {
+							tries++;
+							wait(1000);
+						}
 					}
 					
 					tries = 0;
 					while(emptyVialsInInventory == 0 && tries < 5) {
-						wait(1000);
 						emptyVialsInInventory = inventory.getCount(emptyVialID);
-						tries++;
+						
+						if(emptyVialsInInventory == 0) {
+							wait(1000);
+							tries++;
+						}
 					}
 					
 					bank.close();
@@ -129,9 +145,12 @@ public class AHumidifier extends Script {
 					
 					tries = 0;
 					while(bank.isOpen() && tries < 5) {
-						wait(1000);
 						bank.close();
-						tries++;
+						
+						if(bank.isOpen()) {
+							wait(1000);
+							tries++;
+						}
 					}
 					
 					return 1;
@@ -141,20 +160,22 @@ public class AHumidifier extends Script {
 		
 		if(inventory.getCount(emptyVialID) > 0) {
 			if(tabs.getCurrentTab() != Constants.TAB_MAGIC) tabs.openTab(Constants.TAB_MAGIC);
-			
-			if(humidifyInterface == null)
-				humidifyInterface = interfaces.get(430, 29);
+			humidifyInterface = interfaces.get(430, 29);
 			
 			if(humidifyInterface != null) {
 				input.moveMouse(humidifyInterface.getRealX(), humidifyInterface.getRealY());
 				humidifyInterface.click();
 				
-				wait(2000);
+				wait(3000);
 				
+				tries = 0;
 				while(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
 					tabs.openTab(Constants.TAB_INVENTORY);
-					wait(1000);
-					tries++;
+					
+					if(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
+						wait(1000);
+						tries++;
+					}
 				}
 				
 				if(!inventory.containsItem(emptyVialID) && inventory.containsItem(filledVialID)) {
@@ -163,7 +184,7 @@ public class AHumidifier extends Script {
 					humidifierCasts++;
 				}
 				
-				return 500;
+				return 1;
 			}
 		}
 		
@@ -284,10 +305,15 @@ public class AHumidifier extends Script {
 				case 1:
 					log("Antiban: Spinning camera!");
 					
-					if(random(1,11) % 2 == 0)
+					if(random(1,11) % 2 == 0) {
+						isCameraRotating = true;
 						input.pressArrow(Input.ARROW_LEFT, random(1500, 3500));
-					else
+						isCameraRotating = false;
+					} else {
+						isCameraRotating = true;
 						input.pressArrow(Input.ARROW_RIGHT, random(1500, 3500));
+						isCameraRotating = false;
+					}
 					
 					long c1Timeout = System.currentTimeMillis() + random(30000, 60000);
 					while(System.currentTimeMillis() < c1Timeout && !isStopping) {}
@@ -305,6 +331,33 @@ public class AHumidifier extends Script {
 			}
 			
 			log("Antiban: Shutting down...");
+		}
+	}
+	
+	private class Inventory implements Runnable {
+		public Thing[] items = new Thing[27];
+		
+		@Override
+		public void run() {
+			while(!isStopping) {
+				
+			}
+		}
+		
+		public int getCount() {
+			int itemCount = 0;
+			
+			for(int i = 0; i < items.length; i++)
+				if(items[i] != null)
+					itemCount++;
+			
+			return itemCount;
+		}
+		
+		public int getCount(int... ids) {
+			
+			
+			return 1;
 		}
 	}
 	
