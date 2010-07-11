@@ -218,7 +218,7 @@ public class AHumidifier extends Script {
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
 		//Draw Mouse
-		g.drawImage(cursorImage, input.getBotMousePosition().x, input.getBotMousePosition().y, observer);
+		g.drawImage(cursorImage, input.getBotMousePosition().x - 16, input.getBotMousePosition().y - 16, observer);
 		
 		//Draw Scoreboard
 		NumberFormat number = NumberFormat.getIntegerInstance(Locale.US);
