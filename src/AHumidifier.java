@@ -19,8 +19,6 @@ import com.quirlion.script.Input;
 import com.quirlion.script.Script;
 import com.quirlion.script.types.GEItem;
 import com.quirlion.script.types.Interface;
-import com.quirlion.script.types.Thing;
-import com.sun.xml.internal.xsom.impl.scd.Iterators.Map;
 
 public class AHumidifier extends Script {
 	private boolean hasFireStaff = false, hasSteamStaff = false, hasWaterStaff = false;
@@ -36,8 +34,8 @@ public class AHumidifier extends Script {
 	private long startTime = 0;
 	
 	private Antiban antiban = null;
-	private Image coinImage, drinkImage, sumImage, timeImage, weatherImage;
-	private ImageObserver observer = null;
+	private Image coinImage, cursorImage, drinkImage, sumImage, timeImage, weatherImage;
+	private ImageObserver observer;
 	private Interface humidifyInterface = null;
 	private Thread antibanThread = null;
 	
@@ -48,6 +46,7 @@ public class AHumidifier extends Script {
 		
 		try {
 			coinImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins.png"));
+			cursorImage = ImageIO.read(new URL("http://scripts.allometry.com/app/webroot/img/cursors/cursor-01.png"));
 			drinkImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/drink.png"));
 			sumImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/sum.png"));
 			timeImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/time.png"));
@@ -80,6 +79,8 @@ public class AHumidifier extends Script {
 		
 		startingMagicXP = skills.getCurrentSkillXP(Constants.STAT_MAGIC);
 		startTime = System.currentTimeMillis();
+		
+		cam.setAltitude(true);
 	}
 	
 	@Override
@@ -163,18 +164,24 @@ public class AHumidifier extends Script {
 			humidifyInterface = interfaces.get(430, 29);
 			
 			if(humidifyInterface != null) {
+				int currentXP = skills.getCurrentSkillXP(Constants.STAT_MAGIC);
+				
 				input.moveMouse(humidifyInterface.getRealX(), humidifyInterface.getRealY());
 				humidifyInterface.click();
 				
-				wait(3000);
+				while(currentXP == skills.getCurrentSkillXP(Constants.STAT_MAGIC)) {
+					wait(1);
+				}
 				
-				tries = 0;
-				while(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
-					tabs.openTab(Constants.TAB_INVENTORY);
-					
-					if(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
-						wait(1000);
-						tries++;
+				if(currentXP < skills.getCurrentSkillXP(Constants.STAT_MAGIC)) {
+					while(tabs.getCurrentTab() != Constants.TAB_INVENTORY) {
+						tabs.openTab(Constants.TAB_INVENTORY);
+						
+						if(tabs.getCurrentTab() == Constants.TAB_INVENTORY) {
+							while(inventory.containsItem(emptyVialID) && !inventory.containsItem(filledVialID)) {
+								wait(1);
+							}
+						}
 					}
 				}
 				
@@ -210,20 +217,29 @@ public class AHumidifier extends Script {
 		Graphics2D g = (Graphics2D)g2;
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		
-		int rightBoxX = interfaces.getMinimap().getRealX() - 178;
+		//Draw Mouse
+		g.drawImage(cursorImage, input.getBotMousePosition().x, input.getBotMousePosition().y, observer);
 		
-		//Rectangles
-		RoundRectangle2D clockBackground = new RoundRectangle2D.Float(
-				interfaces.getMinimap().getRealX() - 183,
-				20,
-				128,
-				47,
-				5,
-				5);
+		//Draw Scoreboard
+		NumberFormat number = NumberFormat.getIntegerInstance(Locale.US);
+		int sum = skills.getCurrentSkillXP(Constants.STAT_MAGIC) - startingMagicXP;
+		
+		Scoreboard leftScoreboard = new Scoreboard(Scoreboard.TOP_LEFT, 128, 5);
+		Scoreboard rightScoreboard = new Scoreboard(Scoreboard.TOP_RIGHT, 128, 5);
+		
+		leftScoreboard.addWidget(new ScoreboardWidget(weatherImage, number.format(humidifierCasts)));
+		leftScoreboard.addWidget(new ScoreboardWidget(drinkImage, number.format(vialsFilled)));
+		leftScoreboard.addWidget(new ScoreboardWidget(coinImage, "$" + number.format(vialsFilled * filledVialPrice)));
+		
+		rightScoreboard.addWidget(new ScoreboardWidget(timeImage, millisToClock(System.currentTimeMillis() - startTime)));
+		rightScoreboard.addWidget(new ScoreboardWidget(sumImage, new Integer(sum).toString())); 
+		
+		leftScoreboard.drawScoreboard(g);
+		rightScoreboard.drawScoreboard(g);
 		
 		RoundRectangle2D progressBackground = new RoundRectangle2D.Float(
-				interfaces.getMinimap().getRealX() - 183,
-				72,
+				Scoreboard.gameCanvasRight - 128,
+				rightScoreboard.getHeight() + 30,
 				128,
 				8,
 				5,
@@ -232,52 +248,18 @@ public class AHumidifier extends Script {
 		Double percentToWidth = Math.floor(128 * (skills.getPercentToNextLevel(Constants.STAT_MAGIC) / 100));
 		
 		RoundRectangle2D progressBar = new RoundRectangle2D.Float(
-				interfaces.getMinimap().getRealX() - 183,
-				72,
+				Scoreboard.gameCanvasRight - 128,
+				rightScoreboard.getHeight() + 31,
 				percentToWidth.intValue(),
 				8,
 				5,
 				5);
 		
-		RoundRectangle2D scoreboardBackground = new RoundRectangle2D.Float(
-				20,
-				20,
-				128,
-				71,
-				5,
-				5);
-		
 		g.setColor(new Color(0, 0, 0, 127));
-		g.fill(clockBackground);
 		g.draw(progressBackground);
-		g.fill(scoreboardBackground);
 		
-		g.setColor(new Color(0, 0, 200, 127));
+		g.setColor(new Color(0, 0, 200, 191));
 		g.fill(progressBar);
-		
-		//Text
-		g.setColor(Color.white);
-		g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-		
-		NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
-		
-		g.drawString(nf.format(humidifierCasts), 48, 39);
-		g.drawString(nf.format(vialsFilled), 48, 58);
-		g.drawString("$" + nf.format(vialsFilled * filledVialPrice), 48, 77);
-		
-		if(startTime == 0)
-			g.drawString("Loading", rightBoxX, 37);
-		else
-			g.drawString(millisToClock(System.currentTimeMillis() - startTime), rightBoxX, 37);
-		
-		g.drawString(nf.format(skills.getCurrentSkillXP(Constants.STAT_MAGIC) - startingMagicXP), rightBoxX, 58);
-		
-		//Images
-		g.drawImage(weatherImage, 25, 25, observer);
-		g.drawImage(drinkImage, 25, 25 + 16 + 4, observer);
-		g.drawImage(coinImage, 25, 25 + 16 + 4 + 16 + 4, observer);
-		g.drawImage(timeImage, interfaces.getMinimap().getRealX() - 76, 25, observer);
-		g.drawImage(sumImage, interfaces.getMinimap().getRealX() - 76, 25 + 16 + 4, observer);
 		
 		return ;
 	}
@@ -334,30 +316,111 @@ public class AHumidifier extends Script {
 		}
 	}
 	
-	private class Inventory implements Runnable {
-		public Thing[] items = new Thing[27];
+	public class Scoreboard {
+		public static final int TOP_LEFT = 1, TOP_RIGHT = 2, BOTTOM_LEFT = 3, BOTTOM_RIGHT = 4;
+		public static final int gameCanvasTop = 25, gameCanvasLeft = 25, gameCanvasBottom = 309, gameCanvasRight = 487;
 		
-		@Override
-		public void run() {
-			while(!isStopping) {
+		private ImageObserver observer = null;
+		
+		private int scoreboardLocation, scoreboardX, scoreboardY, scoreboardWidth, scoreboardHeight, scoreboardArc;
+		
+		private ArrayList<ScoreboardWidget> widgets = new ArrayList<ScoreboardWidget>();
+		
+		public Scoreboard(int scoreboardLocation, int width, int arc) {
+			this.scoreboardLocation = scoreboardLocation;
+			scoreboardHeight = 10;
+			scoreboardWidth = width;
+			scoreboardArc = arc;
+			
+			switch(scoreboardLocation) {
+				case 1:
+					scoreboardX = gameCanvasLeft;
+					scoreboardY = gameCanvasTop;
+				break;
 				
+				case 2:
+					scoreboardX = gameCanvasRight - scoreboardWidth;
+					scoreboardY = gameCanvasTop;
+				break;
+				
+				case 3:
+					scoreboardX = gameCanvasLeft;
+				break;
+				
+				case 4:
+					scoreboardX = gameCanvasRight - scoreboardWidth;
+				break;
 			}
 		}
 		
-		public int getCount() {
-			int itemCount = 0;
-			
-			for(int i = 0; i < items.length; i++)
-				if(items[i] != null)
-					itemCount++;
-			
-			return itemCount;
+		public void addWidget(ScoreboardWidget widget) {
+			widgets.add(widget);
 		}
 		
-		public int getCount(int... ids) {
+		public boolean drawScoreboard(Graphics2D g) {
+			try {
+				for (ScoreboardWidget widget : widgets) {
+					scoreboardHeight += widget.getWidgetImage().getHeight(observer) + 4;
+				}
+				
+				if(scoreboardLocation == 3 || scoreboardLocation == 4) {
+					scoreboardY = gameCanvasBottom - scoreboardHeight;
+				}
+				
+				RoundRectangle2D scoreboard = new RoundRectangle2D.Float(
+					scoreboardX,
+					scoreboardY,
+					scoreboardWidth,
+					scoreboardHeight,
+					scoreboardArc,
+					scoreboardArc
+				);
+				
+				g.setColor(new Color(0, 0, 0, 127));
+				g.fill(scoreboard);
+				
+				int x = scoreboardX + 5;
+				int y = scoreboardY + 5;
+				for (ScoreboardWidget widget : widgets) {
+					widget.drawWidget(g, x, y);
+					y += widget.getWidgetImage().getHeight(observer) + 4;
+				}
+				
+				return true;
+			} catch(Exception e) {}
 			
+			return false;
+		}
+		
+		public int getHeight() {
+			return scoreboardHeight;
+		}
+	}
+	
+	public class ScoreboardWidget {
+		private ImageObserver observer = null;
+		private Image widgetImage;
+		private String widgetText;
+		
+		public ScoreboardWidget(Image widgetImage, String widgetText) {
+			this.widgetImage = widgetImage;
+			this.widgetText = widgetText;
+		}
+		
+		public Image getWidgetImage() {
+			return widgetImage;
+		}
+		
+		public String getWidgetText() {
+			return widgetText;
+		}
+		
+		public void drawWidget(Graphics2D g, int x, int y) {
+			g.setColor(Color.white);
+			g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
 			
-			return 1;
+			g.drawImage(widgetImage, x, y, observer);
+			g.drawString(widgetText, x + widgetImage.getWidth(observer) + 4, y + 12);
 		}
 	}
 	
