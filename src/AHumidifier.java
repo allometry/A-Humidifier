@@ -29,7 +29,7 @@ public class AHumidifier extends Script {
 	private int emptyVialID = 229, filledVialID = 227;
 	private int filledVialPrice = 0, humidifierCasts = 0, tries = 0, vialsFilled = 0;
 	private int emptyVialsInInventory = 0;
-	private int startingMagicXP = 0;
+	private int startingMagicXP = 0, startingMagicLevel = 0;
 	
 	private long startTime = 0;
 	
@@ -78,6 +78,8 @@ public class AHumidifier extends Script {
 		antibanThread.start();
 		
 		startingMagicXP = skills.getCurrentSkillXP(Constants.STAT_MAGIC);
+		startingMagicLevel = skills.getCurrentSkillLevel(Constants.STAT_MAGIC);
+		
 		startTime = System.currentTimeMillis();
 		
 		cam.setAltitude(true);
@@ -232,7 +234,12 @@ public class AHumidifier extends Script {
 		leftScoreboard.addWidget(new ScoreboardWidget(coinImage, "$" + number.format(vialsFilled * filledVialPrice)));
 		
 		rightScoreboard.addWidget(new ScoreboardWidget(timeImage, millisToClock(System.currentTimeMillis() - startTime)));
-		rightScoreboard.addWidget(new ScoreboardWidget(sumImage, new Integer(sum).toString())); 
+		
+		int lvlDif = skills.getCurrentSkillLevel(Constants.STAT_MAGIC) - startingMagicLevel;
+		if(lvlDif == 0)
+			rightScoreboard.addWidget(new ScoreboardWidget(sumImage, number.format(sum)));
+		else
+			rightScoreboard.addWidget(new ScoreboardWidget(sumImage, number.format(sum) + " " + "(+" + lvlDif + ")"));
 		
 		leftScoreboard.drawScoreboard(g);
 		rightScoreboard.drawScoreboard(g);
@@ -251,7 +258,7 @@ public class AHumidifier extends Script {
 				Scoreboard.gameCanvasRight - 128,
 				rightScoreboard.getHeight() + 31,
 				percentToWidth.intValue(),
-				8,
+				7,
 				5,
 				5);
 		
